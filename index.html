@@ -1,279 +1,874 @@
-# wxBot [![star this repo](http://github-svg-buttons.herokuapp.com/star.svg?user=liuwons&repo=wxBot&style=flat&background=1081C1)](http://github.com/liuwons/wxBot) [![fork this repo](http://github-svg-buttons.herokuapp.com/fork.svg?user=liuwons&repo=wxBot&style=flat&background=1081C1)](http://github.com/liuwons/wxBot/fork) ![python](https://img.shields.io/badge/python-2.7-ff69b4.svg)
 
-**wxBot** 是用Python包装Web微信协议实现的微信机器人框架。
 
-目前的消息支持情况:
+<html> 
+    <head> 
+		<meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!--[if lt IE 9]>
+      <script src="http://cdn.bootcss.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="http://cdn.bootcss.com/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+ <link href="bootstrap-3.2.0/css/bootstrap.css" rel="stylesheet">
+ <link href="bootstrap-3.2.0/css/bootstrap-theme.css" rel="stylesheet">
+ <link rel="stylesheet" href="css/font-awesome.min.css" >
+ <link rel="stylesheet" href="css/main.css">
+ <link rel="stylesheet" href="css/button.css">
+
+  <script type="text/javascript" src="js/web_socket.js"></script>
+
+<style type="text/css">
+
+.form-signin{
+  max-width: 500px;
+  padding: 15px;
+  margin: 10 auto;
+}
+.imForm {
+  padding: 40px 15px;
+  text-align: center;
+}
+
+
+</style>
+
+        <title>物联实时双向通讯演示</title> 
+
+        <script type="text/javascript">
+		
+            //验证浏览器是否支持WebSocket协议
+            if (!window.WebSocket) { 
+                alert("该浏览器不支持Websocket!\n WebSocket not supported by this browser!"); 
+            } 
+             var ws;
+             var myname="";
+             var isLogin=0;
+             var laststatus=0;
+             var loglines=0;
+             var mytimer;
+             var mytimer2;
+             isnotstart=1;
+             showHUM=true;
+
+			ReconnectAfterFail=3000;
+            function display() { 
+                ShowMaps();
+                //var valueLabel = document.getElementById("valueLabel"); 
+                //valueLabel.innerHTML = "";
+                var myDate = new Date();
+                var mytime=myDate.toLocaleTimeString();
+                url="ws://home.aico.in:8100/";
+                ws=new WebSocket(url); 
+                log(mytime+">>Connecting to: "+url);
+                //监听消息
+                ws.onmessage = function(event) { 
+					//var mymsg=document.getElementById("messageId");
+					//var valueLabel = document.getElementById("valueLabel"); 
+                    //valueLabel.innerHTML+ = event.data; 
+					msg=event.data;
+					jsonstr=msg.substring(5);
+					var jdata = eval('(' + jsonstr + ')');
+					if (!(typeof(jdata['Type']) == "undefined"))
+					{
+						//log(jdata['Type']);
+					switch	(jdata['Type'])
+					{
+						case 'Login':
+							log(">: 请登录");
+$('#myModal').modal('show');
+							break;
+						case 'auth':
+                                                        
+							if (jdata['status']==1)
+                                                         {
+							 log(">: 登录成功");isLogin=1;$('#myModal').modal('hide');$("#mName").html(myname);$("#mName2").html(myname);}
+							else
+							 {log(">: 登录失败，请检查用户名密码!");isLogin=0;$("#loginStatus").html("登录失败，请检查用户名密码!");}	
+							break;
+
+case "Count":
+  {$("#labelCount").html(jdata['Online']);}
+
+break;
+
+case "Broadcast":
+
+if (jdata['mType']==2)  //<------加密的信息,可于更新界面的加密信息
+{
+   var b = new Base64(); 
+   var str = b.decode(jdata['Msg']); 
+   var lines=str.split("\n");
+        for(i=0;i<lines.length;i++){ 
+          uidata= lines[i].split("|");
+          
+          //if ( (uidata[0].indexOf("/")<0) && (!(typeof($(uidata[0]))=="undefined")) ) {$(uidata[0]).html(uidata[1]);}
+         if ( (!(uidata[0].indexOf("/")>0))   && (!($(uidata[0]).length==0)) )  {log(uidata[0]);$(uidata[0]).html(uidata[1]);}
 
-- [ ] 群消息
-  - [x] 文本
-  - [x] 图片
-  - [x] 地理位置
-  - [x] 个人名片
-  - [x] 语音
-  - [x] 动画
-  - [ ] 语音电话
-  - [ ] 红包
+         if   ( ((uidata[0].indexOf("/")<0) && ($("#"+uidata[0]).length>0)) )
+         {
+ 
+              $("#"+uidata[0]).html(uidata[1]);
+              log("Set:["+uidata[0]+"] > " +uidata[1]);
 
-- [ ] 联系人消息
-  - [x] 文本
-  - [x] 图片
-  - [x] 地理位置
-  - [x] 个人名片
-  - [x] 语音
-  - [x] 小视频
-  - [x] 动画
-  - [ ] 视频电话
-  - [ ] 红包
-  - [ ] 转账
+          }
 
-- [x] 消息发送
-  - [x] 文本
-  - [x] 图片
-  - [x] 文件
+        }   
 
+}
 
 
-Web微信协议参考资料：
 
-[挖掘微信Web版通信的全过程](http://www.tanhao.me/talk/1466.html/)
+break;
 
-[微信协议简单调研笔记](http://www.blogjava.net/yongboy/archive/2015/11/05/410636.html)
+case 'Subscribe': //<-------订阅了信息
 
-[qwx: WeChat Qt frontend 微信Qt前端](https://github.com/xiangzhai/qwx)
+   log(">>设备信息已订阅:"+jdata['From']);
 
-**master-dev 分支为开发版本，用于测试新特性，欢迎使用后提出建议!**
+break;
 
+case 'UTC': //<-------服务器时间
+
+   log(">>服务器时间:"+jdata['msg']);
+
+break;
+
+
+case 'Msg':  //收到用户数据
+
+if (jdata['mType']==2)  //<------加密的信息,可于更新界面的加密信息
+{
+   var b = new Base64(); 
+   var str = b.decode(jdata['Msg']); 
+   log(str);
+   var lines=str.split("\n");
+        for(i=0;i<lines.length;i++){ 
+          uidata= lines[i].split("|");
+          
+          //if ( (uidata[0].indexOf("/")<0) && (!(typeof($(uidata[0]))=="undefined")) ) {$(uidata[0]).html(uidata[1]);}
+         if ( (!(uidata[0].indexOf("/")>0))   && (!($(uidata[0]).length==0)) )  {log(uidata[0]);$(uidata[0]).html(uidata[1]);}
 
-## 1 环境与依赖
+         if   ( ((uidata[0].indexOf("/")<0) && ($("#"+uidata[0]).length>0)) )
+         {
+ 
+              $("#"+uidata[0]).html(uidata[1]);
+              log("Set:["+uidata[0]+"] > " +uidata[1]);
 
-此版本只能运行于Python 2环境 。
+          }
 
-**wxBot** 用到了Python **requests** , **pypng** , **Pillow** 以及 **pyqrcode** 库。
-
-使用之前需要所依赖的库:
-
-```bash
-pip install requests
-pip install pyqrcode
-pip install pypng
-pip install Pillow
-```
-
-## 2 快速开发
-
-利用 **wxBot** 最简单的方法就是继承WXBot类并实现 `handle_msg_all` 或者 `schedule` 函数，然后实例化子类并调用 `run` 方法 。
-
-### 2.1 代码
-
-以下的代码对所有来自好友的文本消息回复文本消息 *hi* 、图片消息 *1.png* 以及文件消息 *1.png* ， 并不断向好友 *tb* 发送文本 *schedule* 。
-
-`handle_msg_all` 函数用于处理收到的每条消息，而 `schedule` 函数可以做一些任务性的工作(例如不断向好友推送信息或者一些定时任务)。
-
-```python
-#!/usr/bin/env python
-# coding: utf-8
-
-import time
-from wxbot import *
-
-class MyWXBot(WXBot):
-    def handle_msg_all(self, msg):
-        if msg['msg_type_id'] == 4 and msg['content']['type'] == 0:
-            self.send_msg_by_uid(u'hi', msg['user']['id'])
-            self.send_img_msg_by_uid("img/1.png", msg['user']['id'])
-            self.send_file_msg_by_uid("img/1.png", msg['user']['id'])
-
-    def schedule(self):
-        self.send_msg(u'tb', u'schedule')
-        time.sleep(1)
-
-def main():
-    bot = MyWXBot()
-    bot.DEBUG = True
-    bot.run()
-
-if __name__ == '__main__':
-    main()
-
-```
-
-### 2.2 运行
-
-直接用 `python` 运行代码(如运行测试代码 ***test.py*** ):
-
-``` python
-python test.py
-```
-
-### 2.3 登录微信
-
-程序运行之后，会在当前目录下生成二维码图片文件 ***qr.png*** 并自动打开，用微信扫描此二维码并按操作指示确认登录网页微信。
-
-如果运行在Linux下，还可以通过设置 **WXBot** 对象的 `conf['qr']` 为 `tty` 的方式直接在终端打印二维码(此方法只能在Linux终端下使用)，效果如下：
-
-![login_on_ubuntu](img/login_on_ubuntu.png)
-
-## 3 效果展示
-
-测试代码 ***test.py*** 的运行效果：
-
-![向机器人发送消息](img/send_msg.png)
-
-![后台](img/backfront.jpg)
-
-## 4 接口
-### 4.1 `handle_msg_all`
-
-`handle_msg_all` 函数的参数 `msg` 是代表一条消息的字典。字段的内容为：
-
-| 字段名 | 字段内容 |
-| ----- | --- |
-| `msg_type_id` | 整数，消息类型，具体解释可以查看 **消息类型表** |
-| `msg_id` | 字符串，消息id |
-| `content` | 字典，消息内容，具体含有的字段请参考 **消息类型表** ，一般含有 `type`(数据类型)与 `data`(数据内容)字段，`type` 与 `data`的对应关系可以参考 **数据类型表**  |
-| `user` | 字典，消息来源，字典包含 `name`(发送者名称,如果是群则为群名称，如果为微信号，有备注则为备注名，否则为微信号或者群昵称)字段与 `id`(发送者id)字段，都是字符串  |
-
-
-### 4.2 消息类型表
-
-| 类型号 | 消息类型 | `content` |
-| ----- | --- | ------ |
-| 0 | 初始化消息，内部数据 | 无意义，可以忽略 |
-| 1 | 自己发送的消息 | 无意义，可以忽略 |
-| 2 | 文件消息 | 字典，包含 `type` 与 `data` 字段 |
-| 3 | 群消息 | 字典， 包含 `user` (字典，包含 `id` 与 `name`字段，都是字符串，表示发送此消息的群用户)与 `type` 、 `data` 字段，红包消息只有 `type` 字段， 文本消息还有detail、desc字段， 参考 **群文本消息** |
-| 4 | 联系人消息 | 字典，包含 `type` 与 `data` 字段 |
-| 5 | 公众号消息 | 字典，包含 `type` 与 `data` 字段 |
-| 6 | 特殊账号消息 | 字典，包含 `type` 与 `data` 字段 |
-| 99 | 未知账号消息 | 无意义，可以忽略 |
-
-
-### 4.3 数据类型表
-
-| `type` | 数据类型 | `data` |
-| ---- | ---- | ------ |
-| 0 | 文本 | 字符串，表示文本消息的具体内容 |
-| 1 | 地理位置 | 字符串，表示地理位置 |
-| 3 | 图片 | 字符串，图片数据的url，HTTP POST请求此url可以得到jpg文件格式的数据 |
-| 4 | 语音 | 字符串，语音数据的url，HTTP POST请求此url可以得到mp3文件格式的数据 |
-| 5 | 名片 | 字典，包含 `nickname` (昵称)， `alias` (别名)，`province` (省份)，`city` (城市)， `gender` (性别)字段 |
-| 6 | 动画 | 字符串， 动画url, HTTP POST请求此url可以得到gif文件格式的数据 |
-| 7 | 分享 | 字典，包含 `type` (类型)，`title` (标题)，`desc` (描述)，`url` (链接)，`from` (源网站)字段 |
-| 8 | 视频 | 不可用 |
-| 9 | 视频电话 | 不可用 |
-| 10 | 撤回消息 | 不可用 |
-| 11 | 空内容 | 空字符串 |
-| 12 | 红包 | 不可用 |
-| 13 | 小视频 | 字符串，视频数据的url，HTTP POST请求此url可以得到mp4文件格式的数据 |
-| 99 | 未知类型 | 不可用 |
-
-### 4.4 群文本消息
-
-由于群文本消息中可能含有@信息，因此群文本消息的 `content` 字典除了含有 `type` 与 `data` 字段外，还含有 `detail` 与 `desc` 字段。
-
-各字段内容为：
-
-| 字段 | 内容 |
-| --- | ---- |
-| `type` | 数据类型， 为0(文本) |
-| `data` | 字符串，消息内容，含有@信息 |
-| `desc` | 字符串，删除了所有@信息 |
-| `detail` | 数组，元素类型为含有 `type` 与 `value` 字段的字典， `type` 为字符串 ***str*** (表示元素为普通字符串，此时value为消息内容) 或 ***at*** (表示元素为@信息， 此时value为所@的用户名) |
-
-
-### 4.5 WXBot对象属性
-
-**WXBot** 对象在登录并初始化之后,含有以下的可用数据:
-
-| 属性 | 描述 |
-| ---- | ---- |
-| `contact_list` | 当前用户的微信联系人列表 |
-| `group_list` | 当前用户的微信群列表 |
-| `public_list` | 当前用户关注的公众号列表 |
-| `special_list` | 特殊账号列表 |
-| `session` | **WXBot** 与WEB微信服务器端交互所用的 **Requests** `Session` 对象 |
-
-### 4.6 WXBot对象方法
-
-**WXBot** 对象还含有一些可以利用的方法
-
-| 方法 | 描述 |
-| ---- | --- |
-| `get_icon(uid, gid)` | 获取联系人或者群聊成员头像并保存到本地文件 ***img_[uid].jpg***  , `uid` 为用户id, `gid` 为群id |
-| `get_head_img(id)` | 获取用户头像并保存到本地文件 ***img_[id].jpg*** ，`id` 为用户id(Web微信数据) |
-| `get_msg_img(msgid)` | 获取图像消息并保存到本地文件 ***img_[msgid].jpg*** , `msgid` 为消息id(Web微信数据) |
-| `get_voice(msgid)` | 获取语音消息并保存到本地文件 ***voice_[msgid].mp3*** , `msgid` 为消息id(Web微信数据) |
-| `get_video(msgid)` | 获取视频消息并保存到本地文件 ***video_[msgid].mp4*** , `msgid` 为消息id(Web微信数据) |
-| `get_contact_name(uid)` | 获取微信id对应的名称，返回一个可能包含 `remark_name` (备注名), `nickname` (昵称), `display_name` (群名称)的字典|
-| `send_msg_by_uid(word, dst)` | 向好友发送消息，`word` 为消息字符串，`dst` 为好友用户id(Web微信数据) |
-| `send_img_msg_by_uid(fpath, dst)` | 向好友发送图片消息，`fpath` 为本地图片文件路径，`dst` 为好友用户id(Web微信数据) |
-| `send_file_msg_by_uid(fpath, dst)` | 向好友发送文件消息，`fpath` 为本地文件路径，`dst` 为好友用户id(Web微信数据) |
-| `send_msg_by_uid(word, dst)` | 向好友发送消息，`word` 为消息字符串，`dst` 为好友用户id(Web微信数据) |
-| `send_msg(name, word, isfile)` | 向好友发送消息，`name` 为好友的备注名或者好友微信号， `isfile`为 `False` 时 `word` 为消息，`isfile` 为 `True` 时 `word` 为文件路径(此时向好友发送文件里的每一行)，此方法在有重名好友时会有问题，因此更推荐使用 `send_msg_by_uid(word, dst)` |
-| `is_contact(uid)` | 判断id为 `uid` 的账号是否是本帐号的好友，返回 `True` (是)或 `False` (不是) |
-| `is_public(uid)` | 判断id为 `uid` 的账号是否是本帐号所关注的公众号，返回 `True` (是)或 `False` (不是) |
-
-
-## 5 群聊机器人示例
-
-***bot.py*** 用 **[图灵机器人](http://www.tuling123.com/)** API 以及 **wxBot** 实现了一个自动回复机器人.
-
-此机器人会回复来自联系人的消息，以及群里@此账号的消息。
-
-并且本帐号可以通过发送 *退下* 、 *走开* 、 *关闭* 、 *关掉* 、 *休息* 、 *滚开* 来关闭机器人的自动回复。
-
-也可以通过发送 *出来* 、 *启动* 、 *工作* 来再次开启机器人的自动回复。
-
-群聊时需要将对应的群保存到联系人列表。
-
-群聊实现效果：
-
-![群聊](img/group_chat.png)
-
-![群聊后台](img/group_chat_backend.jpg)
-
-
-***bot.py*** 的运行方法：
-
-- 要接入图灵机器人API时：
-
-  1. 在[图灵机器人官网](http://www.tuling123.com/)注册账号，申请图灵key: [图灵key申请地址](http://www.tuling123.com/html/doc/apikey.html)
-
-  2. 在 ***bot.py*** 文件所在目录下新建 ***conf.ini*** 文件，内容为:(key字段内容为申请到的图灵key)
-
-    ```txt
-    [main]    
-    key=1d2678900f734aa0a23734ace8aec5b1
-    ```
-
-  3. 运行 ***bot.py***
-
-    ```python
-    python bot.py
-    ```
-
-- 不接入图灵机器人API时(此时机器人对联系人消息以及群里@自己的消息统一回复 *知道了* )：
-  1. 运行 ***bot.py***
-
-    ```python
-    python bot.py
-    ```
-
-## 6 类似项目
-
-[feit/Weixinbot](https://github.com/feit/Weixinbot) Nodejs 封装网页版微信的接口，可编程控制微信消息
-
-[littlecodersh/ItChat](https://github.com/littlecodersh/ItChat) 微信个人号接口、微信机器人及命令行微信，Command line talks through Wechat
-
-[Urinx/WeixinBot](https://github.com/Urinx/WeixinBot) 网页版微信API，包含终端版微信及微信机器人
-
-[zixia/wechaty](https://github.com/zixia/wechaty) Wechaty is wechat for bot in Javascript(ES6). It's a Personal Account Robot Framework/Library.
-
-## 7 基于Wxbot延伸的一些项目
-[WxbotManage](https://coding.net/u/vivre/p/WxbotManage/git) 基于Wxbot的微信多开管理和Webapi系统
-
-## 8 交流讨论
-
-问题可以直接开 **issue**
-
-**QQ** 交流群： **429134510**
+        }   
+
+}
+else
+{
+	if (!(typeof(jdata['Msg'])=="undefined"))  log("R:"+ jdata['Msg']);
+}
+
+//=========自定义数据开始==================
+
+		for(var eachInfoKey in jdata)
+		{
+			var targetName='#'+eachInfoKey;	
+		
+			$(targetName).html(jdata[eachInfoKey]);
+                        //console.log(targetName+":"+jdata[eachInfoKey]);
+		}
+
+                $("#LabelTemp").html(jdata['LabelTemp']+"°C");
+                $("#LabelHum").html("Val1:"+jdata['LabelHum']+"%");
+                $("#mapTag").html("  Val2："+ jdata['LabelTemp']+"°C <br>Val1："+jdata['LabelHum']+"%");
+                
+                mtemp=parseFloat(jdata['LabelTemp']);
+                mhum=parseFloat(jdata['LabelHum']);
+                if (isnotstart==1) {viewChars(1); ShowNext();}
+//-------Set Last Update Time--//
+LastMsgDate = new Date();
+
+
+
+//=========自定义数据结束==============
+							break;
+						case 'register':
+							if (jdata['status']==1)
+							 {log(">: 注册成功");$("#loginStatus").html("注册成功!");login();}
+							else
+							 {log(">: 注册失败，用户名已经存在!");	$("#loginStatus").html("注册失败，用户名已经存在!");}
+							break;
+default:
+log("R:"+msg);
+break;
+							
+					}
+					
+					}
+
+
+
+
+//-------Debug info--------------//
+
+
+console.log(event.data);
+						
+                }; 
+                // 打开WebSocket 
+                ws.onclose = function(event) { 
+				if (laststatus==1)  {log("onclose");}
+isLogin=0;
+laststatus=0;
+window.clearInterval(mytimer);
+window.clearInterval(mytimer2);
+ReconnectAfterFail=ReconnectAfterFail+1000;
+log("Reconnect after "+ReconnectAfterFail/1000+"s");
+$("#LabelLastUpdate").html("网络已断开！");
+setTimeout("display();",ReconnectAfterFail);
+				  
+                  //WebSocket Status:: Socket Closed
+                }; 
+                // 打开WebSocket
+                ws.onopen = function(event) { 
+                   //WebSocket Status:: Socket Open
+                    //// 发送一个初始化消息
+					log(">>Socket is Connected!");
+$('#myModal').modal('show');
+                                        if (myname !="") login();
+laststatus=1;
+
+mytimer=window.setInterval('CheckOnlineCount()',3000);//<----定时检查在线人数
+
+LastMsgDate = new Date();
+mytimer2=window.setInterval('CheckLastMsgSecond()',500);//<----定时检查在线人数
+
+
+
+
+SubscribeMails("w5500"); //<------订阅信息
+
+                    //ws.send("Hello, Server!"); 
+                }; 
+                ws.onerror =function(event){
+laststatus=0;
+					for ( var p in event) {
+						log(p + "=" + event[p]);
+					}
+                    //WebSocket Status:: Error was reported
+                };
+            } 
+            var log = function(s) {  
+			if (document.readyState !== "complete") {  
+				log.buffer.push(s);  
+			} else {  
+				document.getElementById("contentId").innerHTML = (s + "\n")+document.getElementById("contentId").innerHTML;
+
+loglines=loglines+1;
+if (loglines>10) {document.getElementById("contentId").innerHTML = (s + "\n");loglines=0;}
+  
+			}  
+}  
+
+			function formatDataLen(i)
+			{
+			var s=i.toString();
+			  switch (s.length)
+			  {
+			  case 1:
+			    s='0000'+s;
+				break;
+			  case 2:
+				s='000'+s;
+				break;
+			  case 3:
+				s='00'+s;
+				break;	
+			  case 4:
+				s='0'+s;
+				break;				
+			  }
+			  return s;
+			}
+			
+			function login_(user,pass)
+			{
+			var jsondata="{\"Type\":\"Login\",\"User\":\""+user+"\",\"Pass\":\""+pass+"\",\"VerID\":\"V2\"}";
+			var jdata=formatDataLen(jsondata.length+5)+jsondata;
+			//alert(jdata);
+			ws.send(jdata); 
+                        myname=user;
+			}
+
+                        //获取服务器时间
+			function CheckUTC()
+			{
+			var jsondata="{\"Type\":\"UTC\",\"VerID\":\"V2\"}";
+			var jdata=formatDataLen(jsondata.length+5)+jsondata;
+			//alert(jdata);
+                       console.log(jdata);
+			ws.send(jdata); 
+
+			}
+
+
+			function CheckOnlineCount()
+			{
+			var jsondata="{\"Type\":\"Count\",\"VerID\":\"V2\"}";
+			var jdata=formatDataLen(jsondata.length+5)+jsondata;
+			//alert(jdata);
+                       //log(jdata);
+			ws.send(jdata); 
+			}
+
+			function SubscribeMails(publiser)
+			{
+			var jsondata="{\"Type\":\"Subscribe\",\"Publisher\":\""+publiser+"\",\"VerID\":\"V2\"}";
+			var jdata=formatDataLen(jsondata.length+5)+jsondata;
+			//alert(jdata);
+                       //log(jdata);
+			ws.send(jdata); 
+			}
+
+
+			function sendMsg_(from,to,msg){
+				var jsondata="{\"Type\":\"Msg\",\"From\":\""+from+"\",\"To\":\""+to+"\",\"Msg\":\""+msg+"\",\"VerID\":\"V2\"}";
+				var jdata=formatDataLen(jsondata.length+5)+jsondata;
+				 ws.send(jdata); 
+			}
+
+
+
+			function sendMsg_WX(from,to,msg,wxID){
+				var jsondata="{\"Type\":\"Msg\",\"From\":\""+from+"\",\"To\":\""+to+"\",\"Msg\":\""+msg+"\",\"WXID\":\""+wxID+"\",\"VerID\":\"V2\"}";
+				var jdata=formatDataLen(jsondata.length+5)+jsondata;
+				 ws.send(jdata); 
+				 console.log(jdata);
+                              log("S:"+ msg);
+			}
+
+            function sendMsg(){
+               if (isLogin==0) { $('#myModal').modal('show'); return 0;}
+                var msg=document.getElementById("messageId");
+				var receiver=document.getElementById("receiver");
+				var  sender=document.getElementById("user");
+				var  WxRcv=document.getElementById("WeixinID");
+			    sendMsg_WX(sender.value,receiver.value,msg.value,WxRcv.value);
+                                  document.getElementById("messageId").value='';
+
+				
+                //alert(msg.value);
+               
+            }
+			
+            function login(){
+                var user=document.getElementById("user");
+                $("#loginStatus").html(user.value+" 正在登录...");
+				var pass=document.getElementById("pass");
+			    login_(user.value,pass.value);
+				//alert(jsondata);
+                //alert(msg.value);
+               
+            }
+
+			function reg_(user,pass)
+			{
+			var jsondata="{\"Type\":\"Register\",\"User\":\""+user+"\",\"Pass\":\""+pass+"\",\"VerID\":\"V2\"}";
+			var jdata=formatDataLen(jsondata.length+5)+jsondata;
+			//alert(jdata);
+			ws.send(jdata); 
+			}
+
+            function reg(){
+                var user=document.getElementById("user");
+				var pass=document.getElementById("pass");
+			        reg_(user.value,pass.value);
+				//alert(jsondata);
+                //alert(msg.value);
+               
+            }
+
+           function CheckLastMsgSecond()
+           {
+             var nowtime=new Date(); 
+             var OverSeconds=0;
+             OverSeconds=(nowtime.getTime()-LastMsgDate.getTime())/1000;
+             $("#LabelLastUpdate").html(OverSeconds+"秒 前收到更新");
+           }
+
+        
+
+        </script> 
+    </head> 
+    <body onload="display()"> 
+
+    <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#"><span id="mName" class="badge">HTML5 IM</span></a>
+        </div>
+        <div id="navbar" class="collapse navbar-collapse">
+        <div class="tabbable">
+            <ul class="nav nav-tabs">
+                <li class="active"><a href="#tab-page1" data-toggle="tab">在线调试</a></li>
+                <li><a href="#tab-page2" data-toggle="tab">运行状态</a></li>
+                <li><a href="#tab-page3" data-toggle="tab">扫一扫</a></li>
+                <li><a href="#tab-page4" data-toggle="tab">通讯协议</a></li>
+            </ul>
+
+        </div>
+
+
+
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+
+
+            <div class="tab-content">
+                <div class="tab-pane active" id="tab-page1"> 
+<!--第一卡页面----!>
+
+      <div class="imForm">
+
+      <form class="form-signin" role="form">
+
+        <textarea  rows="10" class="form-control" id="contentId" readonly="true"></textarea>
+
+        <input name="receiver" id="receiver" class="form-control" placeholder="Receiver"  value="a001"/>
+        <input name="WeixinID" id="WeixinID"  class="form-control" placeholder="WxID"  value=""/>
+        <input name="message" id="messageId"  class="form-control" placeholder="Message"  value=""/>
+
+
+        <a class="btn btn-lg btn-primary btn-block"  onClick="javascript:sendMsg()"> <span id="mName2" class="badge"></span> Send   </a>
+ <br/>
+  <a href="javascript:CheckUTC();">服务器时间</a>
+  <span class="label label-primary">当前在线:</span>
+   <span id="labelCount" class="label label-success">...</span>
+<br/>
+ 
+<span id="Label1" name="Label1" class="label label-primary">Label1</span>  <span id="Label2" class="label label-success">Label2</span> 
+
+<img src="img/usr_on_map.png">
+
+      </form>
+</div>
+
+
+                </div>
+                <div id="tab-page2" class="tab-pane">
+<!--第二卡页面----!>
+ <div class="imForm">
+<br/>
+<span id="labelTitle2" class="label label-primary">val1/val2实时监控</span> 
+<br/><br/>
+<div id="container" style="width:960px;height:400px;margin:0 auto;"></div>
+<div style="width:960px;height:300px;margin:0 auto;" id="MapContainer"></div>
+
+<span class="button-wrap"><a href="#" id="LabelTemp" class="button button-circle">---</a></span>
+<br/><br/>
+<span id="LabelHum" class="badge">--</span>  
+<br/>
+
+<br/>
+<span id="LabelLastUpdate" class="badge">--</span>  
+<br/>
+
+
+<br/>
+
+<span id="label4" class="badge">--</span> 
+<span id="label5" class="label label-primary">--</span> 
+<span id="label6" class="label label-success">--</span> 
+<span id="label7" class="label label-danger">--</span> 
+<span id="label8" class="badge">--</span> 
+
+
+
+<br/>
+<img src="img/usr_on_map.png">
+
+
+
+
+
+<br/>
+<div>
+<span id="label6" class="label label-success">框架结构</span> 
+</div>
+<br/>
+
+<div>
+<span id="label5" class="label label-primary">STM32(TCP)</span>
+<span id="label6" class="label label-success"><=></span>
+<span id="label5" class="label label-primary">Server</span>
+<span id="label6" class="label label-success"><=></span>
+<span id="label5" class="label label-primary">HTML5</span>
+</div>
+
+</div>
+
+
+                </div>
+                <div id="tab-page3" class="tab-pane">
+<!--第三卡页面----!>
+ <div class="imForm">
+<br/><br/>
+<h2>微信扫一扫</h2>
+                  <img src="img/connectme.png">
+</div>
+                </div>
+
+                <div id="tab-page4" class="tab-pane">
+<!--第四卡页面----!>
+
+<br/><br/>
+<h2>开放API</h2>
+
+		<div class="span6">
+			<dl>
+				<dt>
+					协议目的
+				</dt>
+				<dd>
+					<pre>为具备TCP/WebSocket通讯能力的设备或者软件app等之间提供实时通讯服务!</pre>
+				</dd>
+				<dt>
+					工作原理
+				</dt>
+				<dd>
+<pre>
+      -----------[ 服  务  器]---------------
+      |	         |            |             |
+ [硬件设备]  [电脑软件]   [手机app]    [网页HTML5]
+
+</pre>
+				</dd>
+				<dt>
+					演示
+				</dt>
+				<dd>
+<pre>
+
+http演示页面:  <a href="http://im.aico.in" target="_blank">http://im.aico.in</a>
+
+</pre>
+				</dd>
+				<dt>
+					协议地址
+				</dt>
+				<dd>
+<pre>
+TCP服务器：    im.aico.in  端口:8480
+
+HTML5 WS :     ws://im.aico.in:8480
+
+如需要使用协议中的发信功能，请先<a href="http://im.aico.in" target="_blank">注册</a>一个设备识别号和密码. 
+</pre>
+</dd>
+
+				<dt>
+					协议格式
+				</dt>
+				<dd>
+<pre>
+  数据包长度+json数据 <br/>
+  00000+json数据
+		  
+  数据包例子:  
+  00089{"Type":"Msg","From":"a001","Pass":"a001","To":"a002","Msg":"12:31:25","VerID":"V2"}
+
+</pre>
+
+<strong>数据包格式</strong>
+
+<pre>
+
+<strong>客户端发送的数据包：</strong>
+
+<strong>1.登录+收发信数据包</strong>
+
+   用途:登录/发送信息/接收信息
+
+   00000                     //数据包长度，不足5位前面补0
+  {
+   "Type":"Msg",             //数据包类型
+   "From":"发件人",	     //发信人，也就是你自己
+   "Pass":"密码",            //密码
+   "To":"收件人",	     //[可选]收件人，如果是多个收件人，用符号 |  隔开. 没有该字段，代表广播信息。
+   "你的字段1":"你的内容1",  //[可选]自定义的字段和内容
+    ....
+   "你的字段n":"你的内容n"   //[可选]自定义的字段和内容
+  }
+
+   数据包例子1：
+   00089{"Type":"Msg","From":"a001","Pass":"a001","To":"a002","Msg":"12:31:25","VerID":"V2"}
+
+   注意：A:如需登录服务器，可以自己给自己发一条信息，也可以给收件人发一条通知信息.
+         B:如果收件人包括 Anyone(A大写)将会把该信息发给所有的订阅者.
+
+
+
+<strong>2.Ping/Pong  </strong>
+
+   用途: 心跳协议,用于查看和服务器是否畅通，或者看对方是否在线,
+         收件人可以为空,ping服务器 ，或者不为空，ping对方
+
+   00000                      //数据包长度，不足5位前面补0
+   {"Type":"Ping",
+   "From":"发信人",
+   "To":"收件人1",           //如果收件人为空，则ping 服务器是否在线
+   "VerID":"V2"
+   }
+   
+   ping数据包例子：
+   00059{"Type":"Ping","From":"a001","To":"a003","VerID":"V2"}
+
+
+<strong>3.订阅信息</strong>
+  用途：用于订阅接收指定终端设备的信息.(支持未登录的匿名用户订阅)
+
+   00000                      //数据包长度，不足5位前面补0
+  {
+  "Type":"Subscribe",
+  "Publisher":"发布人",     //订阅那些设备的信息，其中发布人为终端的ID，多用户可以用|隔开
+  "VerID":"V2"
+  };
+
+  提问Q1：如何发布信息？ 
+      A1: 发信息的时候，收件人为 Anyone 就会把该信息发给所有订阅者。
+
+
+
+
+
+****************************************************************************
+
+<strong>服务器返回的数据包：</strong>
+
+
+<strong>1. pong数据</strong>
+   
+   00000
+   {"Type":"Pong",
+   "From":"a003",    //对方的id
+   "Status":"0",     //是否在线  0--离线 1---在线
+   "VerID":"V2"} 
+     
+   例:00060{"Type":"Pong","From":"a003","Status":"0","VerID":"V2"} 
+ 
+
+<strong>2. auth是否登录成功 (第一次发送数据的时候返回)</strong>
+   00044{"Type":"auth","status":1,"VerID":"V2"}  ----> status =1 成功 status !=1  失败
+
+
+<strong>3. msg接收信息</strong>
+
+    详见 [1.登录+收发信数据包]
+
+<strong>4. Login要求登录</strong>
+    服务器未收到登录数据，需根据协议[1.登录+收发信数据包]进行登录. 
+    数据例子：00077{"Type":"Login","Token":"124772becf5678ff432868dc2c1a306c","VerID":"V2"}
+
+</pre>
+				</dd>
+			</dl>
+		</div>
+
+
+                </div>  <!--end of tab-page4--!>
+
+
+
+            </div>
+        </div>
+</div>
+
+    <div class="container">
+
+    </div>
+
+
+<!-- Modal -->
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+        <h4 class="modal-title" id="myModalLabel">如需控制远程设备请登录，否则请关闭登录窗口</h4>
+      </div>
+      <div class="modal-body">
+        <input name="user" id="user" class="form-control" placeholder="UserID"  value=""/>
+        <input name="pass" id="pass"  class="form-control" placeholder="password"  value=""/>
+
+        <div class="checkbox">
+          <label>
+             <input type="checkbox" value="remember-me"> Remember me
+          </label>
+        </div>
+
+        <div class="container">
+          <label>
+             <span id="loginStatus" name="loginStatus"  class="label label-warning" ></span>
+          </label>
+        </div>
+
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" onclick="javascript:reg();">注册</button>
+        <button type="button" class="btn btn-primary" onclick="javascript:login();">登录</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+  </div> <!-- /container -->
+		<div style="width:50%">
+			<div>
+				<canvas id="canvas" height="450" width="600"></canvas>
+			</div>
+		</div>
+
+<script src="http://cdn.bootcss.com/jquery/1.11.1/jquery.min.js"></script>
+<script src="bootstrap-3.2.0/js/bootstrap.min.js"></script>
+<script src="js/chart/Chart.js"></script>
+<script src="js/base64.js"></script>
+
+<script type="text/javascript" src="js/hcharts.js"></script>
+
+
+<script>
+function ShowNext()
+{
+   showHUM=!showHUM;
+   chart = $('#container').highcharts();
+   if(showHUM)
+   chart.setTitle({ text: "<a href='javascript:ShowNext();'>Vol%</a>",useHTML:true }); 
+   else
+   chart.setTitle({ text: "<a href='javascript:ShowNext();'>Val°C</a>",useHTML:true });
+   
+
+}
+
+function viewChars(x) { 
+        isnotstart=0;    
+        showx=x;                         
+	Highcharts.setOptions({                                                     
+		global: {                                                               
+			useUTC: false  ,
+                        useHTML:true                                                      
+		}                                                                       
+	});                                                                         
+																		
+	var chart;                                                                  
+	$('#container').highcharts({                                                
+		chart: {                                                                
+			type: 'spline',                                                     
+			animation: Highcharts.svg, // don't animate in old IE               
+			marginRight: 5,                                                    
+			events: {                                                           
+				load: function() {                                              
+																				
+					// set up the updating of the chart each second             
+					var series = this.series[0];    
+					setInterval(function() {                                    
+						var x = (new Date()).getTime(), // current time  
+                                                
+						y = mtemp;  if (showHUM)  y=mhum;   
+                                                series.addPoint([x, y], true, true);  
+                                               //  series2.addPoint([x, mhum], true, true);                   
+					}, 1000);                                                   
+				}                                                               
+			}                                                                   
+		},                                                                      
+		title: {                                                                
+			text: '<a href="javascript:ShowNext();">Val1°C</a>'
+                                                                   
+		},                                                                      
+		xAxis: {                                                                
+			type: 'datetime',                                                   
+			tickPixelInterval: 100                                              
+		},                                                                      
+		yAxis: {                                                                
+			title: {                                                            
+				text: 'val1/val2'                                                   
+			},                                                                  
+			plotLines: [{                                                       
+				value: 0,                                                       
+				width: 1,                                                       
+				color: '#808080'                                                
+			}]                                                                  
+		},                                                                      
+		tooltip: {                                                              
+			formatter: function() {                                             
+					return '<b>'+ this.series.name +'</b><br/>'+                
+					Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) +'<br/>'+
+					Highcharts.numberFormat(this.y, 2);                         
+			}                                                                   
+		},                                                                      
+		legend: {                                                               
+			enabled: false                                                      
+		},                                                                      
+		exporting: {                                                            
+			enabled: false                                                      
+		},                                                                      
+		series: [{                                                              
+			name: 'val1°C',                                                
+			data: (function() {                                                 
+				// generate an array of random data                             
+				var data = [],                                                  
+					time = (new Date()).getTime(),                              
+					i;                                                          
+																				
+				for (i = -19; i <= 0; i++) {                                    
+					data.push({                                                 
+						x: time + i * 1000,                                     
+						y: mtemp
+					});                                                         
+				}                                                               
+				return data;                                                    
+			})()                                                                
+		}		
+		]                                                                      
+	});                                                                         
+}              
+</script>
+
+
+
+
+<script charset="utf-8" src="http://map.qq.com/api/js?v=2.exp"></script>
+<script>
+function ShowMaps() {
+    var center = new qq.maps.LatLng(40.15176,116.302146);
+    var map = new qq.maps.Map(document.getElementById('MapContainer'),{
+        center: center,
+        zoom: 13
+    });
+    var infoWin = new qq.maps.InfoWindow({
+        map: map
+    });
+    infoWin.open();
+    infoWin.setContent('<div id="mapTag" style="width:200px;padding-top:10px;">'+
+        '<img style="float:left;" src="http://imgqq.5308.com/20061107/uploadfile/2006/6/29/11375752645.gif"/> '+
+        '别找了!<br>我就在这里</div>');
+    infoWin.setPosition(center);
+}
+</script>
+
+
+
+
+
+    </body> 
+</html>																																																																																																																																																																																																																																																																																																																																																																
