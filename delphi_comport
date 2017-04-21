@@ -1,0 +1,685 @@
+1.串口通信的基本原理：
+一般计算机与外部设备通讯有两种方式：
+并行传送（Parallel ）：一次的传输量为8个位（1字节），通过并行端口，如打印机
+串行传送（Serial ）：一次只传输1个位，通过串行端口，如RS-232
+位与字节的概念：
+二进制中的每一位0和1，被叫做一个位，每8个位构成一个字节
+一个字节中最右面的位被称为第0位，最左面的位被称为第7位。
+传输过程中的字节类型：一般有两种。
+1.文本（字符字母、标点符号等）在计算机中存储时，每个不同的字符都用不同的数值来表示。这些数值的范围通常在0-127或0-255范围。
+7位：ASCII码，每个字节留一个备用位
+8位：前128个遵循ASCII码规则，其余的128个用来做扩展字符、数字符号、图形字符等编码。
+
+2.二进制数据：
+某些可执行指令文件和图形图像文件就是以二进制形式而不是ASCII码形式存储的。
+一个数据可用二进制形式存储，可以占多个字节。在通信领域，常常把这种类型的资料叫做二进制数据。
+今天要讲的就是有关二进制数据的处理方法。
+
+文本的处理方法比较简单。我以前写过一个测试软件发布在盒子上。可以从这个地址下载：http://www.delphibox.com/article.asp?articleid=2877
+
+几个概念：
+波特率：每秒所能产生的最大电压状态改变率（一秒钟可以振荡的次数）bps
+通信双方必须要取得一样的通信速度。原始信号经过不一样的波特率取样后，所得的结果完全不一样，如取样速度只有原来一半时，信号被跳着取样，数据因此错误。
+数据位：有5,6,7,8四种
+停止位：在奇偶位（选择有奇偶校验）或数据位（选择无奇偶校验）之后发送或接收的停止位。停止位的长度可在1、1．5或2位 三者中选择）。
+奇偶校验位：数据传输之后是可供选择的奇偶校验位发送和接收。奇偶位的状态取决于选择的奇偶校验类型。如果选择奇校验，则该字符数据中为1的位数与校验位相加，结果应为奇数。可选奇，偶或无。
+如果要保证通讯畅通。通讯双方以上4项设置必须一致。
+一个字节是8位，数据位可以7位，然后一位校验位就8位了。
+这些参数可以自己设置。但是如果要保证通讯畅通。通讯双方以上4项设置必须一致。
+
+ 2.Delphi中串口通信常用的常用控件
+进行串口通讯可以用Windows的Api函数：
+Delphi的Windows.pas单元文件中已经将Win32 API均声明进去，因此在Delphi里面使用API时只要在uses 区段中加入Windows，使其引用该单元文件即可。
+串行通信相关函数：
+CreateFile:建立文件，在此用打开通信端口
+CloseHandle:关闭由CreateFile建立的文件，在此用于关闭通信端口
+GetCommState:取得计算机串口的设置参数
+SetCommState:设置计算机串口的参数
+WriteFile:将数据写入文件，在此用来将数据由串口送出
+ReadFile:由文件中读取数据，在此用来取得送到串口的数据
+ClearCommError:清除串行端口的错误，并取得信息
+PurgeComm：清除串口上的缓冲区
+EscapeCommFunction：控制串口的硬件状态
+SetCommMask：设置事件的掩码，用以触发事件
+WaitCommEvent：等待设置事件的发生
+GetCommModemStatus：取得串口上的硬件线路状态
+这里不推荐使用Windows API函数。
+虽然用API函数可以实现很强大很灵活的功能，但是势必要花更多的时间和精力在通讯细节上。而Delphi的是RAD的经典代表，当然会有更简单的方法，那就是使用封装好的控件。
+较常用的控件有spcomm，mscomm，comport，apro等。其中mscomm是ActiveX控件，另外3个控件都是Delphi控件，自带源码，可以到delphi盒子，Delphi园地，sourceforge等网站下载。具体使用方法这里不详细介绍。
+
+ 3.数据帧的概念
+今天我们主要讲的是二进制数据的处理，所以先介绍下数据帧的概念。
+我们要进行数据通讯，那么通讯双方必须遵循一定的协议，这样，通讯双方才能够相互理解从对方所接收过来的数据。
+帧是传送信息的基本单元，每帧由帧起始符标志域，控制域，数据长度域，数据域，帧信息纵向校验域及帧结束域等6个域组成。每个域由若干字节组成。
+
+比如有这样一个帧格式：
+代码     字节数    说明    
+68H 1    帧起始符      
+RTUA     4       终端逻辑地址   
+MSTA     2       主站地址与命令序号  
+68H      1       帧起始符   
+C        1       控制码 
+L        2       数据长度  
+DATA    变长     数据域
+CS       1     校验码 
+16H      1     结束码  
+从这个数据帧格式可以看出，一个数据帧至少有13个字节。而且前后中间都有规定。这样我们就可以通过处理分析其中的某些字节来判断这一个数据帧的意义，来进行其他相关的工作。
+当然不同的系统数据帧格式会有不同。我们今天就用这个格式作例子。
+
+
+4.数据的接收与发送
+今天我只介绍下使用Comport控件接收和发送数据。
+接收数据：在OnRxChar事件中。
+onRxChar的原型:procedur TForm1.ComPortRxChar(Sender: TObject; Count: Integer)
+这个事件当接收缓冲区中有数据时触发，count为缓冲区中的字节数。
+发送数据：发送数据本控件提供了6个函数：
+WaitForAsync
+WaitForEvent
+Write
+WriteAsync
+WriteStr
+WriteStrAsync
+较常使用的是WriteStr。
+
+function WriteStr(const Str: String): Integer;
+参数为字符串类型，返回实际发送的字节数。
+apro功能很强大，而且开发这个控件组的公司已经倒闭，贡献了所有的源代码。
+除了mscomm以外，另外3个都有源代码。
+为什么用WriteStr，这里要解释下string类型。
+
+ Delphi的String类型非常强大，可以兼容PChar，Array of Char,WideString 等字符串或字符数组类型。还有一个很关键的作用是可以作为动态Byte数组来使用。
+虽然很多参考书上没有介绍这种用法，但是经过我多次测试以及实践经验，发现没有出现任何不良反应。 
+比如你要发送$68 80 50 60 20 30 10 00 00 20这几个字符，可以定义一个字符串A:string;然后用下面的代码：
+       setlength(A,10);
+       A[1]:=Chr(68);
+       A[2]:=Chr(80);
+       。。。。
+       A[9]:=Chr(00)
+       A[10]:=Chr(20)
+       writestr(A);
+当然看起来很烦琐，其实这不是String的优势所在。它真正的优势在于
+1.无须管理内存，交给Delphi来管理。
+2.可以很方便的作为参数或者变量来进行处理。后面讲。   
+5.数据的处理
+
+前面讲了4节，都是废话。重点在这一节。
+如果从终端不断的发送数据到服务器上来，例如每隔10毫秒发送一帧数据，我们如何区分这些数据呢？
+要知道，串口通讯是一位一位来传送的，接收则是一个字节一个字节来接收的，不是一帧一帧来接收的。为了要判断一个字节是前一帧的数据还是后一帧的数据，我们也只能一个字节一个字节的判断。
+先看一段代码，然后我再解释这段代码。这样我们就可以明确地获取每一帧的数据了。讲完这个之后，我再解释如何利用Delphi的面向对象特性来处理收到的这一帧数据。
+
+帧格式就用刚才介绍的那个格式。
+先定义几个全局变量：
+FDataStatus:Word;  //0 就绪  1.帧头1  2.帧头2
+FNextLength:Word;  //接下来要读的长度
+FCurrentLength:Word;  //当前的长度
+FtmpStr:string;//一帧数据
+代码如下：
+procedure ComPortRxChar(Sender: TObject; Count: Integer);
+var
+  S1:string;
+  J:Integer;
+begin
+  case FDataStatus of
+    0:begin
+      J:=0;
+      FtmpStr:='';
+      repeat
+        ComPort.ReadStr(S1,1);
+        J:=J+1;
+      until (Ord(S1[1])=$68) or (J=Count);
+      if Ord(S1[1])=$68 then
+       begin
+        FtmpStr:=S1;
+        FDataStatus:=1;
+        FNextLength:=10;
+        FCurrentLength:=0;
+     end;
+    end;
+    1:begin
+      J:=FCurrentLength;
+      repeat
+        ComPort.ReadStr(S1,1);
+        FtmpStr:=FtmpStr+S1;
+        FCurrentLength:=FCurrentLength+1;
+      until (FCurrentLength=FNextLength) or (FCurrentLength-J=Count);
+      if FCurrentLength=FNextLength then
+     begin
+        FDataStatus:=2;
+        FNextLength:=(Ord(FtmpStr[11]) shl 8) + Ord(FTmpStr[10])+2;
+        FCurrentLength:=0;
+      end;
+    end;
+    2:begin
+      J:=FCurrentLength;
+      repeat
+        ComPort.ReadStr(S1,1);
+        FtmpStr:=FtmpStr+S1;
+        FCurrentLength:=FCurrentLength+1;
+      until (FCurrentLength=FNextLength) or (FCurrentLength-J=Count);
+      if FCurrentLength=FNextLength then
+      begin
+        FDataStatus:=0;
+        FNextLength:=0;
+        FCurrentLength:=0;
+        FReceiveFrame.Str:=FtmpStr;
+        SendMessage(CommServer.Handle,XM_OutData,0,LongWord(@FReceiveFrame));
+      end;
+    end;
+  end;
+end;
+ case FDataStatus of
+判断目前接收的数据段。
+    0:begin
+      J:=0;
+      FtmpStr:='';
+      repeat
+        ComPort.ReadStr(S1,1);
+        J:=J+1;
+      until (Ord(S1[1])=$68) or (J=Count);
+      if Ord(S1[1])=$68 then
+      begin
+        FtmpStr:=S1;
+        FDataStatus:=1;
+        FNextLength:=10;
+        FCurrentLength:=0;
+      end;
+    end;
+如果是一帧开始，那么就对相关参数进行初始化，数据帧初始化为空。
+J:=0;
+FtmpStr:='';
+然后开始读，直到读到帧起始符$68或者读完为止，没有的话，就抛弃读到的数据（当然你也可以另外记下来，不过意义不大）。
+   repeat
+        ComPort.ReadStr(S1,1);
+        J:=J+1;
+      until (Ord(S1[1])=$68) or (J=Count);
+ J就是读到的数据，J＝count表示读完了缓冲区。
+ Ord(S1[1])=$68，S1是个字符串，ORD（S1[1]）表示S1的第一个字节。 
+ ComPort.ReadStr(S1,1);每次只读一个字节，所以S1里只有1个字节。
+如果$68在你读的第二个字节里，那不是蒙混过关了？
+如果读到了$68,就接下来设置读状态为第二阶段，帧数据加上$68，下阶段长度为10,读取的字节数为0.然后结束函数。
+ if Ord(S1[1])=$68 then
+     begin
+        FtmpStr:=S1;
+        FDataStatus:=1;
+        FNextLength:=10;
+        FCurrentLength:=0;
+      end;
+如果缓冲区还有数据，它将再次触发OnRxChar事件。
+只要缓冲区中有数据，没有处理或者没有正在处理，就会一直触发OnRxChar事件。
+刚才将读状态设置为第二阶段了，那么现在就会执行第二阶段的代码：
+ Case语句来判断的。
+    1:begin
+      J:=FCurrentLength;
+      repeat
+        ComPort.ReadStr(S1,1);
+        FtmpStr:=FtmpStr+S1;
+        FCurrentLength:=FCurrentLength+1;
+      until (FCurrentLength=FNextLength) or (FCurrentLength-J=Count);
+      if FCurrentLength=FNextLength then
+     begin
+        FDataStatus:=2;
+        FNextLength:=(Ord(FtmpStr[11]) shl 8) + Ord(FTmpStr[10])+2;
+        FCurrentLength:=0;
+      end;
+    end;
+ J:=FCurrentLength;//计数器，记下共读了几个。
+RTUA    4       终端逻辑地址      
+MSTA     2       主站地址与命令序号   
+68H 1     帧起始符      
+C     1     控制码   
+L     2     数据长度      
+这就是我们第二阶段要读的10个字节。
+
+第二阶段的处理是读10个字节，不管缓冲区里有几个字节，不管读几次，读满10个为止。 
+repeat
+        ComPort.ReadStr(S1,1);
+        FtmpStr:=FtmpStr+S1;
+        FCurrentLength:=FCurrentLength+1;
+      until (FCurrentLength=FNextLength) or (FCurrentLength-J=Count);
+ FNextLength＝10是第一阶段设置的。
+读到10个字节之后将进入第三阶段。
+ if FCurrentLength=FNextLength then
+      begin
+        FDataStatus:=2;
+        FNextLength:=(Ord(FtmpStr[11]) shl 8) + Ord(FTmpStr[10])+2;
+        FCurrentLength:=0;
+      end;
+下一阶段要读几个呢？
+FNextLength:=(Ord(FtmpStr[11]) shl 8) + Ord(FTmpStr[10])+2;
+DATA      变长       数据域   
+CS   1     校验码   
+16H 1     结束码
+这就是最后一阶段要读的字节数。
+但是DATA是变长，所以我们才会多分一阶段，如果都是定长的话，只用判断到帧起始符，然后再读需要的字节数就可以了。
+
+好在有个
+L     2     数据长度
+表示DATA的长度。
+所以就有了这一句。
+FNextLength:=(Ord(FtmpStr[11]) shl 8) + Ord(FTmpStr[10])+2;
+＋2是最后两个字节。
+
+接下来就是第三个阶段了：
+ 2:begin
+      J:=FCurrentLength;
+      repeat
+        ComPort.ReadStr(S1,1);
+       FtmpStr:=FtmpStr+S1;
+        FCurrentLength:=FCurrentLength+1;
+      until (FCurrentLength=FNextLength) or (FCurrentLength-J=Count);
+      if FCurrentLength=FNextLength then
+      begin
+        FDataStatus:=0;
+        FNextLength:=0;
+        FCurrentLength:=0;
+        FReceiveFrame.Str:=FtmpStr;
+        SendMessage(CommServer.Handle,XM_OutData,0,LongWord(@FReceiveFrame));
+      end;
+    end;
+  end;
+
+第三个阶段的读法跟前面一样，都是读一个计一个，直到读完需要的字节为止。
+J:=FCurrentLength;
+      repeat
+        ComPort.ReadStr(S1,1);
+        FtmpStr:=FtmpStr+S1;
+        FCurrentLength:=FCurrentLength+1;
+      until (FCurrentLength=FNextLength) or (FCurrentLength-J=Count);
+读好了就初始化：
+
+if FCurrentLength=FNextLength then
+      begin
+        FDataStatus:=0;
+        FNextLength:=0;
+        FCurrentLength:=0;
+        FReceiveFrame.Str:=FtmpStr;
+ SendMessage(CommServer.Handle,XM_OutData,0,LongWord(@FReceiveFrame)); 
+最后就得到一帧完整的数据FtmpStr，然后将这个数据发送给处理数据的函数。
+SendMessage(CommServer.Handle,XM_OutData,0,LongWord(@FReceiveFrame));
+相关的函数就会来处理它了。
+这样，不关什么东西来，什么时候来，一帧完整的数据都在FtmpStr这个字符串里
+当然具体的读法还要根据数据帧的格式来定，但是万变不离其宗：就是将读到的字节跟给定的格式比较。
+有了这些知识，就基本上可以应付串口通讯程序的编写了。
+考虑到Delphi面向对象的特性，如果不用类来规范数据帧的格式似乎有些可惜了。
+还是拿刚才那帧数据格式来举例：
+我们可以这样定义基类。
+  TCustomGY = class(TObject)
+  //0 规约基类
+  private
+    FFrameBegin:Byte;               //帧起始符
+    FTerminalLogicAddr:T4Byte;      //终端逻辑地址
+    FMasterStation:T2Byte;          //主站地址与命令序号
+    FFrameBegin2:Byte;              //帧起始符
+    FFrameControl:Byte;             //控制码
+    FDataLength:Word;               //数据长度
+    FFrameVerify:Byte;              //校验码
+    FFrameEnd:Byte;                 //结束码
+    FPosSend:TFramePosTerminal;     //帧发起端
+    FPosReceive:TFramePosTerminal;  //帧接收端
+    procedure SetDataLength(const Value: Word);
+    procedure SetFrameBegin(const Value: Byte);
+    procedure SetFrameBegin2(const Value: Byte);
+    procedure SetFrameControl(const Value: Byte);
+    procedure SetFrameEnd(const Value: Byte);
+    procedure SetFrameVerify(const Value: Byte);
+    function ReadFrameDataLengthHi: Byte;
+    function ReadFrameDataLengthLo: Byte;
+    function ReadFrameFSEQ: Byte;
+    function ReadFrameISEQ: Byte;
+    function ReadFrameMSTA: Byte;
+    function ReadFrameMSTA2: Byte;
+    procedure SetPosReceive(const Value: TFramePosTerminal);
+    procedure SetPosSend(const Value: TFramePosTerminal);
+    procedure SetMS1(const Value: Byte);
+    procedure SetMS2(const Value: Byte);
+    procedure SetFrameFSEQ(const Value: Byte);
+    procedure SetFrameISEQ(const Value: Byte);
+    procedure SetFrameMSTA(const Value: Byte);
+    procedure SetFrameMSTA2(const Value: Byte);
+    function GetTerminalAddr: Word;
+    function GetTerminalLogicAddr(const AIndex: T4Integer): Byte;
+    procedure SetTerminalAddr(const Value: Word);
+    procedure SetTerminalLogicAddr(const AIndex: T4Integer;
+      const Value: Byte);
+    function GetMasterStation(const AIndex: T2Integer): Byte;
+    procedure SetMasterStation(const AIndex: T2Integer; const Value: Byte);
+    function GetTerminalLogicAddrStr: string;
+    procedure SetTerminalLogicAddrStr(const Value: string);
+    function GetMasterstationStr: string;
+    procedure SetMasterstationStr(const Value: string);
+  protected
+    procedure SetData(const Value: string); virtual; abstract;//设置数据区 虚函数,实现方法在子类中
+    function ReadData:string; virtual; abstract;//ReadData虚函数,由子类重载.
+    function ToVerifyFrame: Boolean; virtual;//帧是否正确
+    function ReadWholeFrame: string; virtual;
+    procedure setWholeFrame(const Value: string); virtual;
+  public
+    property FrameBegin:Byte read FFrameBegin write SetFrameBegin; //帧起始符
+    property RTUA[const AIndex:T4Integer]:Byte
+    read GetTerminalLogicAddr write SetTerminalLogicAddr; //终端逻辑地址
+    property RTUAStr:string read GetTerminalLogicAddrStr write SetTerminalLogicAddrStr;
+    property TerminalAddr:Word read GetTerminalAddr write SetTerminalAddr; //终端地址
+    property MSTAs[const AIndex:T2Integer]:Byte read GetMasterStation write SetMasterStation; //主站地址与命令序号
+    property MSTAStr:string read GetMasterstationStr write SetMasterstationStr;
+    property FrameBegin2:Byte read FFrameBegin2 write SetFrameBegin2;      //第二个帧起始符
+    property FrameControl:Byte read FFrameControl write SetFrameControl;   //控制码
+    property DataLength:Word read FDataLength write SetDataLength;         //数据长度,2位,地位在前,高位在后
+    property Data:string read ReadData write SetData;                      //数据,虚属性,在子类实现
+    property CS:Byte read FFrameVerify write SetFrameVerify;      //帧校验位
+    property FrameEnd:Byte read FFrameEnd write SetFrameEnd;               //帧结束码
+    property FrameIsRight:Boolean read ToVerifyFrame;                      //检测帧是否正确
+    property WholeFrame:string read ReadWholeFrame write setWholeFrame;    //整帧信息,虚函数,子类实现
+    property MS1:Byte read FMasterStation[0] write SetMS1;                    //MS1
+    property MS2:Byte read FMasterStation[1] write SetMS2;                    //MS2
+    property MSTA:Byte read ReadFrameMSTA write SetFrameMSTA;                 //MSTA
+    property MSTA2:Byte read ReadFrameMSTA2 write SetFrameMSTA2;              //MSTA2,发送端和接收端都为主站时有效
+    property ISEQ:Byte read ReadFrameISEQ write SetFrameISEQ;                 //ISEQ
+    property FSEQ:Byte read ReadFrameFSEQ write SetFrameFSEQ;                 //FSEQ
+    property DataLengthLo:Byte read ReadFrameDataLengthLo;                    //数据长度低位
+    property DataLengthHi:Byte read ReadFrameDataLengthHi;                    //数据长度高位
+    property PosSend:TFramePosTerminal read FPosSend write SetPosSend;             //帧发送端
+    property PosReceive:TFramePosTerminal read FPosReceive write SetPosReceive;    //帧接收端
+    class function VerifyFrame(S:string): Boolean;  //帧是否正确
+    class function GetVerifyByte(S:string):Byte;    //得到校验码
+    constructor Create; virtual;
+    destructor Destory; virtual;
+    function DecodeFrame(const S:string;NoError:Boolean=True):Boolean; //dynamic; //分解操作后返回True
+    function SumVerify:Byte; dynamic;               //计算数据帧CS码
+    function SumDataLength:Word; dynamic;           //计算数据长度
+  end;
+所有的判断处理的东西都交给这个类。
+然后不同的命令再派生出不同的子类。
+留两个接口，一个进一个出。
+其他的那些中间数据就随意处置。
+实现代码就不贴了。
+再示范一个从基类派生的最简单的应用：
+  TSimplyGY = class(TCustomGY)
+  private
+    FData:TarrayByte;       //已处理好的Data,需要反转的数据已经反转
+  protected
+    procedure SetData(const Value: string); override; //设置数据区
+    function ReadData:string; override; //ReadData
+  public
+  end;
+子类中实现基类规定的虚函数。
+有了这样一个类，就可以派生Data区不同的子类了。所要做的处理就是处理Data数据。不同的命令Data域的格式不同。
+ Data数据域的处理，其原理和上面所讲的类似，无非都是字节比较判断。
+再分享几个自己在处理串口通讯中比较常用的函数，有兴趣的可以看看，给初学者参考下：
+ function StrToHexStr(const S:string):string;
+//字符串转换成16进制字符串
+var
+  I:Integer;
+begin
+  for I:=1 to Length(S) do
+  begin
+    if I=1 then
+      Result:=IntToHex(Ord(S[1]),2)
+    else Result:=Result+' '+IntToHex(Ord(S[I]),2);
+  end;
+end;
+function HexStrToStr(const S:string):string;
+//16进制字符串转换成字符串
+var
+  t:Integer;
+  ts:string;
+  M,Code:Integer;
+begin
+  t:=1;
+  Result:='';
+  while t<=Length(S) do
+  begin
+    while not (S[t] in ['0'..'9','A'..'F','a'..'f']) do
+      inc(t);
+    if (t+1>Length(S))or(not (S[t+1] in ['0'..'9','A'..'F','a'..'f'])) then
+      ts:='$'+S[t]
+    else
+      ts:='$'+S[t]+S[t+1];
+    Val(ts,M,Code);
+    if Code=0 then
+      Result:=Result+Chr(M);
+    inc(t,2);
+  end;
+end;
+function StrToTenStr(const S:string):string;
+//字符串转换成10进制字符串
+var
+  I:Integer;
+begin
+  for I:=1 to Length(S) do
+  begin
+    if I=1 then
+      Result:=IntTostr(Ord(S[1]))
+    else Result:=Result+' '+IntToStr(Ord(S[I]));
+  end;
+end;
+function StrToByteArray(const S:string):TarrayByte;
+//字符串转换成相应Byte
+var
+  I:Integer;
+begin
+  SetLength(Result,Length(S));
+  for I:=1 to Length(S) do
+    Result[I-1]:=Ord(S[I]);
+end;
+function ByteArrayToStr(const aB:TarrayByte):string;//Byte转换成相应字符串
+var
+  I:Integer;
+begin
+  SetLength(Result,High(aB)+1);
+  for I:=0 to High(aB) do
+    Result[I+1]:=Chr(aB[I]);
+end;
+function StrToBcdByteArray(const S:string; const Rotate:Boolean=False):TarrayByte; //字符串转换成相应BCDByte
+var
+  ts:string;
+  I:Integer;
+begin
+  if Odd(Length(S)) then
+    ts:='0'+S
+  else ts:=S;
+  SetLength(Result,Length(ts) div 2);
+  for I:=0 to High(Result) do
+  begin
+    if Rotate then
+      Result[High(Result)-I]:=StrToInt('$'+ts[2*I+1]+ts[2*I+2])
+    else
+      Result[I]:=StrToInt('$'+ts[2*I+1]+ts[2*I+2]);
+  end;
+end;
+function BcdByteArrayToStr(const aNum:TarrayByte; const Rotate:Boolean=False):string; //BCDByte转换成相应字符串
+var
+  I:Integer;
+  t:string;
+begin
+  SetLength(Result,2*(High(aNum)+1));
+  for I:=0 to High(aNum) do
+  begin
+    t:=IntToHex(aNum[I],2);
+    if Rotate then
+    begin
+      Result[2*(High(aNum)-I)+1]:=t[1];
+      Result[2*(High(aNum)-I)+2]:=t[2];
+    end
+    else begin
+      Result[2*I+1]:=t[1];
+      Result[2*I+2]:=t[2];
+    end;
+  end;
+end;
+//集合形式转换成数组
+function SetToByteArray(s:array of const):TarrayByte;
+var
+  I:Byte;
+begin
+  SetLength(Result,High(s)+1);
+  for I:=0 to High(s) do
+    Result[I]:=S[I].VInteger;
+end;
+function SetToWordArray(s:array of const):TarrayWord;
+var
+  I:Byte;
+begin
+  SetLength(Result,High(s)+1);
+  for I:=0 to High(s) do
+    Result[I]:=S[I].VInteger;
+end;
+function StrToBinStr(const S:string):string;
+//字符串转换为2进制字符串
+var
+  I:Integer;
+begin
+  Result:='';
+  for I:=1 to Length(S) do
+  begin
+    if I=1 then
+      Result:=BinStrArray[Ord(S[1])]
+    else Result:=Result+' '+BinStrArray[Ord(S[I])];
+  end;
+end;
+function ByteToBinStr(const B:Byte):string;
+//Byte型转换为二进制字符串
+var
+  I:Integer;
+begin
+  Result:='';
+  for I:=7 downto 0 do
+    Result:=Result+Chr(((B shr I) and 1)+48);
+end;
+function BinStrToByte(const S:string):Byte;
+//二进制字符串转成数字
+var
+  S1:string[8];
+  L:Integer;
+  I:Integer;
+begin
+  S1:='00000000';
+  L:=min(8,Length(S));
+  for I:=L downto 1 do
+    if S[I]='1' then
+      S1[8+I-L]:=S[I]
+    else
+      S1[8+I-L]:='0';
+  Result:=0;
+  for I:=0 to 7 do
+    Result:=Result+(((Ord(S1[I+1])-48) shl (7-I)));
+end;
+function T2ByteToWord(const T:T2Byte;const LowFront:Boolean=False):Word;
+//T2Byte类型转换成Word类型
+var
+  a1,a2:Byte;
+begin
+  if LowFront then
+  begin
+    a1:=T[1];
+    a2:=T[0];
+  end
+  else begin
+    a1:=T[0];
+    a2:=T[1];
+  end;
+  Result:=a1;
+  Result:=(Result shl 8) + a2;
+end;
+function WordToT2Byte(const aNum:Word;const LowFront:Boolean=False):T2Byte;//Word类型转换成T2Byte类型
+var
+  a1,a2:Byte;
+begin
+  a1:=aNum;
+  a2:=aNum shr 8;
+  if LowFront then
+  begin
+    Result[0]:=a1;
+    Result[1]:=a2;
+  end
+  else begin
+    Result[0]:=a2;
+    Result[1]:=a1;
+  end;
+end;
+function ByteToBCDByte(const B:Byte;const aType:TBCDType=bt8421):Byte;
+//Byte转换成BCD码
+var
+  B1,B2:Byte;
+  function T2421(const P:Byte):Byte;
+  begin
+    if P<5 then
+      Result:=P
+    else Result:=P+6;
+  end;
+begin
+  if B>99 then
+    Result:=0
+  else begin
+    B1:=B div 10;
+    B2:=B mod 10;
+   case aType of
+      bt8421:begin
+        Result:=(B1 shl 4)+B2;
+      end;
+      bt2421:begin
+        Result:=(T2421(B1) shl 4)+T2421(B2);
+      end;
+      btR3:begin
+        Result:=((B1+3) shl 4)+(B2+3)
+      end;
+      else Result:=(B1 shl 4)+B2;
+    end;
+  end;
+end;
+function BCDByteToByte(const B:Byte;const aType:TBCDType=bt8421):Byte;
+//BCD转成Byte型
+var
+  B1,B2:Byte;
+  function Ts2421(const P:Byte):Byte;
+  begin
+    if P<5 then
+      Result:=P
+    else Result:=P-6;
+  end;
+begin
+  B1:=(B and $F0) shr 4;
+  B2:=B and $0F;
+  case aType of
+    bt8421: begin
+     Result:=B1*10+B2;
+    end;
+    bt2421: begin
+      Result:=(Ts2421(B1)*10)+Ts2421(B2);
+    end;
+    btR3: begin
+      Result:=((B1-3)*10)+(B2-3)
+    end;
+    else Result:=B1*10+B2;
+  end;
+end;
+function BCDByteToByteFF(const B:Byte;Auto:Boolean=True):Byte;
+//BCD转成Byte型 FF-->FF 8421码
+var
+  B1,B2:Byte;
+begin
+  if (B=$FF)or(Auto and (B>=$AA)) then
+    Result:=B
+  else begin
+    B1:=(B and $F0) shr 4;
+    B2:=B and $0F;
+    Result:=B1*10+B2;
+  end;
+end;
+function ByteToBCDByteFF(const B:Byte;Auto:Boolean=True):Byte;
+//Byte转换成BCD码 FF-->FF 8421码
+var
+  B1,B2:Byte;
+begin
+  if (B=$FF)or(Auto and (B>=$AA)) then
+    Result:=B
+  else if B>99 then
+    Result:=0
+  else begin
+    B1:=B div 10;
+    B2:=B mod 10;
+    Result:=(B1 shl 4)+B2;
+  end;
+end;
+
+ 6.结束语
+不管硬盘空间、内存空间还是Cpu缓存空间，串口缓存空间等等，都只是一个载体，里面填充的是什么东西，如果不按照某些规则来解释的话是完全没有意义的，通讯程序只是一些比较简单的规则应用罢了。
